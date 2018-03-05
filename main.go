@@ -48,6 +48,15 @@ func newUser(w http.ResponseWriter, r *http.Request, _ httprouter.Params) {
 	people = append(people, p)
 }
 
+func deleteUser(w http.ResponseWriter, r *http.Request, ps httprouter.Params) {
+	for i := range people {
+		if people[i].ID == ps.ByName("ID") {
+			people = append(people[:i], people[i+1:]...)
+			break
+		}
+	}
+}
+
 func main() {
 	people = append(people, Person{ID: "1", Firstname: "John", Lastname: "Doe", Address: &Address{City: "City X", State: "State X"}})
 	people = append(people, Person{ID: "2", Firstname: "Koko", Lastname: "Doe", Address: &Address{City: "City Z", State: "State Y"}})
@@ -57,6 +66,7 @@ func main() {
 	router.GET("/users", getAllUsers)
 	router.GET("/users/:ID", getUser)
 	router.POST("/users", newUser)
+	router.DELETE("/users/:ID", deleteUser)
 
 	log.Fatal(http.ListenAndServe(":8080", router))
 }
