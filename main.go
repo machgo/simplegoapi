@@ -71,12 +71,18 @@ func deleteUser(w http.ResponseWriter, r *http.Request, ps httprouter.Params) {
 	for i := range people {
 		if people[i].ID == ps.ByName("ID") {
 			people = append(people[:i], people[i+1:]...)
-			break
+			return
 		}
 	}
+	w.WriteHeader(http.StatusNotFound)
 }
 
 func newTransaction(w http.ResponseWriter, r *http.Request, ps httprouter.Params) {
+	if r.TLS.PeerCertificates[0].Subject.CommonName != ps.ByName("ID") {
+		w.WriteHeader(http.StatusUnauthorized)
+		return
+	}
+
 	decoder := json.NewDecoder(r.Body)
 	t := Transaction{}
 	err := decoder.Decode(&t)
