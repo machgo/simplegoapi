@@ -1,12 +1,17 @@
 package main
 
 import (
+	"crypto/ecdsa"
+	"crypto/elliptic"
+	"crypto/rand"
 	"crypto/tls"
 	"encoding/json"
 	"fmt"
 	"log"
 	"net/http"
+	"time"
 
+	jwt "github.com/dgrijalva/jwt-go"
 	"github.com/julienschmidt/httprouter"
 )
 
@@ -32,9 +37,35 @@ type Transaction struct {
 }
 
 var people []Person
+var tokensignkey, _ = ecdsa.GenerateKey(elliptic.P256(), rand.Reader)
 
 func testRequest(w http.ResponseWriter, r *http.Request, _ httprouter.Params) {
 	fmt.Fprintf(w, "Hello %v! \n", r.TLS.PeerCertificates[0].Subject.CommonName)
+}
+
+func createToken(w http.ResponseWriter, r *http.Request, _ httprouter.Params) {
+	token := jwt.NewWithClaims(jwt.SigningMethodES256, jwt.MapClaims{
+		"foo": "bar",
+		"nbf": time.Date(2015, 10, 10, 12, 0, 0, 0, time.UTC).Unix(),
+	})
+
+	tokenString, _ := token.SignedString(tokensignkey)
+
+	fmt.Fprintf(w, tokenString)
+}
+
+func checkToken(w http.ResponseWriter, r *http.Request, _ httprouter.Params) {
+	parsedToken, _ := jwt.Parse(r.Header.Get("Authorization"), func(_ *jwt.Token) (interface{}, error) {
+		return &tokensignkey.PublicKey, nil
+	})
+
+	if claims, ok := parsedToken.Claims.(jwt.MapClaims); ok && parsedToken.Valid {
+		fmt.Fprintf(w, "token is valid\n")
+		fmt.Fprintf(w, "%s, %f", claims["foo"], claims["nbf"])
+
+	} else {
+		fmt.Fprintf(w, "invalid")
+	}
 }
 
 func getUserByID(id string) (p *Person) {
@@ -119,6 +150,8 @@ func main() {
 	router.DELETE("/users/:ID", deleteUser)
 	router.POST("/transaction/:ID", newTransaction)
 	router.GET("/test", testRequest)
+	router.GET("/authenticate", createToken)
+	router.GET("/testtoken", checkToken)
 
 	certPath := "c:\\temp\\server.pem"
 	keyPath := "c:\\temp\\server.key"
